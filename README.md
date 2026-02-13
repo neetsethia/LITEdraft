@@ -1,49 +1,70 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LiteDraft Studio | Enterprise</title>
+    <title>liteDRAFT</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --bg: #f4f4f5; --canvas-bg: #ffffff;
-            --ui-bg: rgba(255, 255, 255, 0.95);
-            --accent: #6366f1; --text: #18181b;
-            --border: #e4e4e7; --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --ui-bg: rgba(255, 255, 255, 0.98);
+            --text: #18181b; --border: #e4e4e7;
+            --accent: #6366f1; --highlight: #e0e7ff;
+            --wall-color: #18181b;
+        }
+        [data-theme="dark"] {
+            --bg: #18181b; --canvas-bg: #09090b;
+            --ui-bg: rgba(24, 24, 27, 0.95);
+            --text: #f4f4f5; --border: #27272a;
+            --accent: #818cf8; --highlight: #312e81;
+            --wall-color: #ffffff;
         }
         body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
 
-        /* --- UI COMPONENTS --- */
+        /* --- UI LAYOUT --- */
         #toolbar {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             background: var(--ui-bg); border: 1px solid var(--border); border-radius: 12px;
-            display: flex; gap: 8px; padding: 8px; box-shadow: var(--shadow); z-index: 100;
-            backdrop-filter: blur(8px);
+            display: flex; gap: 8px; padding: 8px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         
         #inspector {
-            position: absolute; right: 20px; top: 20px; width: 260px;
-            background: var(--ui-bg); border: 1px solid var(--border); border-radius: 12px;
-            padding: 20px; box-shadow: var(--shadow); z-index: 90; backdrop-filter: blur(8px);
+            position: absolute; right: 20px; top: 20px; width: 280px; height: 85vh;
+            background: var(--ui-bg); border: 1px solid var(--border); border-radius: 16px;
+            padding: 20px; z-index: 90; box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column;
         }
 
         .btn {
             width: 40px; height: 40px; border: none; background: transparent; border-radius: 8px;
-            cursor: pointer; color: #52525b; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; color: var(--text); opacity: 0.7; transition: all 0.2s; 
+            display: flex; align-items: center; justify-content: center; font-size: 18px;
         }
-        .btn:hover { background: #f4f4f5; color: var(--text); }
-        .btn.active { background: var(--accent); color: white; }
+        .btn:hover { background: var(--border); opacity: 1; }
+        .btn.active { background: var(--accent); color: white; opacity: 1; }
         
-        .section-header { 
-            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; 
-            color: #71717a; margin: 16px 0 8px 0; 
+        /* --- OBJECT TREE STYLES --- */
+        #object-tree {
+            flex-grow: 1; overflow-y: auto; margin-top: 15px; border-top: 1px solid var(--border); padding-top: 10px;
         }
+        .tree-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer;
+            border-bottom: 1px solid transparent; transition: background 0.1s;
+        }
+        .tree-item:hover { background: var(--bg); }
+        .tree-item.selected { background: var(--highlight); border-left: 3px solid var(--accent); }
+        .tree-label { flex-grow: 1; margin: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tree-icon { opacity: 0.5; font-size: 14px; }
         
+        /* Inputs */
+        input, select { background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 6px; border-radius: 6px; width: 100%; box-sizing: border-box; }
+
         #hud {
-            position: absolute; background: var(--text); color: white; padding: 6px 12px;
-            border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
-            pointer-events: none; display: none; z-index: 200; transform: translate(15px, 15px);
+            position: absolute; background: var(--accent); color: white; padding: 4px 10px;
+            border-radius: 4px; font-family: monospace; font-size: 11px;
+            pointer-events: none; display: none; z-index: 200;
         }
 
         canvas { display: block; background: var(--canvas-bg); cursor: crosshair; }
@@ -54,40 +75,35 @@
 <div id="hud"></div>
 
 <nav id="toolbar">
-    <button class="btn active" id="tool-line" onclick="setTool('line')" title="Draw Wall (L)">📏</button>
+    <button class="btn active" id="tool-line" onclick="setTool('line')" title="Draw (L)">📏</button>
     <button class="btn" id="tool-dim" onclick="setTool('dim')" title="Dimension (D)">📐</button>
     <div style="width:1px; background:var(--border); margin:4px 0;"></div>
-    <button class="btn" id="tool-select" onclick="setTool('select')" title="Select & Edit (V)">🖐️</button>
-    <button class="btn" onclick="undo()" title="Undo (Cmd+Z)">⟲</button>
+    <button class="btn" id="tool-select" onclick="setTool('select')" title="Select (V)">🖐️</button>
+    <button class="btn" onclick="deleteSelected()" title="Delete">🗑️</button>
     <div style="width:1px; background:var(--border); margin:4px 0;"></div>
-    <button class="btn" onclick="exportPDF()" title="Export with Legend">📄</button>
+    <button class="btn" onclick="toggleTheme()" title="Theme">🌓</button>
 </nav>
 
 <aside id="inspector">
-    <div style="font-weight:700; font-size:16px; margin-bottom:4px;">Project Specs</div>
-    <div style="font-size:12px; color:#71717a;">Enterprise Suite v2.0</div>
+    <div style="font-weight:800; font-size:20px; letter-spacing:-0.5px;">liteDRAFT</div>
+    <div style="font-size:11px; opacity:0.6; margin-bottom: 15px;">Object Manager</div>
 
-    <div class="section-header">Active Layer</div>
-    <select id="layerSelect" onchange="activeLayer=this.value; render();" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border);">
-        <option value="Structural">Structural (Wall)</option>
-        <option value="Furniture">Furniture</option>
-        <option value="Utilities">Utilities (Gas/Elec)</option>
-    </select>
+    <div id="properties-panel" style="display:none; margin-bottom: 15px; background: var(--bg); padding:10px; border-radius:8px;">
+        <label style="font-size:10px; font-weight:700; opacity:0.5;">NAME / LABEL</label>
+        <input type="text" id="prop-name" oninput="updateProp('name', this.value)" style="margin-bottom:8px;">
+        
+        <label style="font-size:10px; font-weight:700; opacity:0.5;">LAYER</label>
+        <select id="prop-layer" onchange="updateProp('layer', this.value)">
+            <option value="Structural">Structural</option>
+            <option value="Furniture">Furniture</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Dimension">Dimension</option>
+        </select>
+    </div>
 
-    <div class="section-header">Visual Style</div>
-    <label style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;">
-        <span>Rough Sketch</span>
-        <input type="checkbox" id="roughToggle" onchange="render()">
-    </label>
-    
-    <div class="section-header">Cost Estimate (BOM)</div>
-    <div style="background:#f4f4f5; padding:12px; border-radius:8px; font-size:12px;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-            <span>Wall Length:</span> <strong id="bom-ft">0.0'</strong>
-        </div>
-        <div style="display:flex; justify-content:space-between; color:var(--accent);">
-            <span>Total Cost:</span> <strong id="bom-cost">$0.00</strong>
-        </div>
+    <div style="font-size:10px; font-weight:700; opacity:0.5; letter-spacing:1px;">SCENE OBJECTS</div>
+    <div id="object-tree">
+        <div style="padding:20px; text-align:center; opacity:0.4; font-size:12px;">No objects yet.<br>Start drawing!</div>
     </div>
 </aside>
 
@@ -96,205 +112,201 @@
 <script>
     const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
     
-    // --- STATE MANAGEMENT ---
-    let shapes = [];
-    let history = [];
+    // --- STATE ---
+    let shapes = []; 
+    let selectedId = null;
     let tool = 'line';
     let drawing = false;
     let p1 = {x:0, y:0}, p2 = {x:0, y:0};
-    let activeLayer = 'Structural';
-    let inputBuffer = "";
     
-    // Layer Configuration (Color & Cost per Foot)
+    // Config
     const LAYERS = {
-        'Structural': { color: '#18181b', width: 3, cost: 55, pattern: [] },
-        'Furniture':  { color: '#6366f1', width: 2, cost: 0,  pattern: [] },
-        'Utilities':  { color: '#ef4444', width: 2, cost: 25, pattern: [10, 5] },
-        'Dimension':  { color: '#a1a1aa', width: 1, cost: 0,  pattern: [] }
+        'Structural': { color: '#18181b', width: 3, dash: [] },
+        'Furniture':  { color: '#6366f1', width: 2, dash: [] },
+        'Utilities':  { color: '#ef4444', width: 2, dash: [10, 5] },
+        'Dimension':  { color: '#a1a1aa', width: 1, dash: [] }
     };
 
-    // --- CORE RENDER LOOP ---
+    // --- RENDER ---
     function render() {
-        // Resize Canvas to Window
-        if(canvas.width !== window.innerWidth) {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if(canvas.width !== window.innerWidth) { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         
-        // Draw Grid
+        // Theme Colors
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const wallCol = isDark ? '#ffffff' : '#18181b';
+        LAYERS.Structural.color = wallCol;
+
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--canvas-bg');
+        ctx.fillRect(0,0,canvas.width, canvas.height);
         drawGrid();
 
-        // Draw Shapes
         shapes.forEach(s => {
-            const style = LAYERS[s.layer] || LAYERS['Structural'];
-            ctx.beginPath();
-            ctx.strokeStyle = style.color;
-            ctx.lineWidth = style.width;
-            ctx.setLineDash(style.pattern);
+            if(!s.visible) return;
+            
+            const style = LAYERS[s.layer] || LAYERS.Structural;
+            const isSel = s.id === selectedId;
 
-            // Rough Mode Logic (Jitter)
-            if(document.getElementById('roughToggle').checked && s.layer !== 'Dimension') {
-                const jit = () => (Math.random()-0.5)*2;
-                ctx.moveTo(s.x1+jit(), s.y1+jit());
-                ctx.lineTo(s.x2+jit(), s.y2+jit());
-            } else {
-                ctx.moveTo(s.x1, s.y1);
-                ctx.lineTo(s.x2, s.y2);
-            }
+            ctx.beginPath();
+            ctx.strokeStyle = isSel ? '#6366f1' : style.color; // Highlight Selection
+            ctx.lineWidth = isSel ? style.width + 2 : style.width;
+            ctx.setLineDash(style.dash);
+            ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2);
             ctx.stroke();
 
-            // Dimension Rendering
-            if (s.layer === 'Dimension') drawDimensionText(s);
+            // Draw Label
+            if(s.name || s.layer === 'Dimension') drawLabel(s);
+            
+            // Draw Grips
+            if(isSel) drawGrips(s);
         });
 
-        // Draw Preview Line
         if(drawing) {
-            ctx.beginPath();
-            ctx.strokeStyle = '#6366f1';
-            ctx.setLineDash([4, 4]);
-            ctx.moveTo(p1.x, p1.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.stroke();
-            ctx.setLineDash([]);
+            ctx.beginPath(); ctx.strokeStyle = '#6366f1'; ctx.setLineDash([4, 4]);
+            ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
         }
-        
-        updateBOM();
+    }
+
+    function drawGrips(s) {
+        ctx.fillStyle = '#6366f1';
+        ctx.fillRect(s.x1-4, s.y1-4, 8, 8);
+        ctx.fillRect(s.x2-4, s.y2-4, 8, 8);
+    }
+
+    function drawLabel(s) {
+        const mx = (s.x1+s.x2)/2, my = (s.y1+s.y2)/2;
+        const txt = s.name || (Math.hypot(s.x2-s.x1, s.y2-s.y1)/24).toFixed(1)+"'";
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--canvas-bg');
+        ctx.fillRect(mx-15, my-8, 30, 16);
+        ctx.fillStyle = "#a1a1aa"; ctx.font = "10px Inter"; 
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(txt, mx, my);
     }
 
     function drawGrid() {
-        ctx.strokeStyle = '#e4e4e7';
+        ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--border');
         ctx.lineWidth = 1;
-        const step = 24; // 1ft
-        for(let x=0; x<canvas.width; x+=step*2) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
-        for(let y=0; y<canvas.height; y+=step*2) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
+        for(let i=0; i<canvas.width; i+=48) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+        for(let i=0; i<canvas.height; i+=48) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
     }
 
-    function drawDimensionText(s) {
-        const midX = (s.x1 + s.x2) / 2;
-        const midY = (s.y1 + s.y2) / 2;
-        const len = (Math.hypot(s.x2-s.x1, s.y2-s.y1) / 24).toFixed(1) + "'";
+    // --- OBJECT TREE MANAGER ---
+    function updateTree() {
+        const tree = document.getElementById('object-tree');
+        if(shapes.length === 0) {
+            tree.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.4; font-size:12px;">No objects yet.</div>';
+            return;
+        }
+
+        tree.innerHTML = shapes.map(s => `
+            <div class="tree-item ${s.id === selectedId ? 'selected' : ''}" onclick="selectShape(${s.id})">
+                <span class="tree-icon">${s.layer === 'Dimension' ? '📐' : '📏'}</span>
+                <span class="tree-label">${s.name || (s.layer + ' ' + s.id.toString().slice(-3))}</span>
+                <span class="tree-icon" onclick="toggleVis(event, ${s.id})">${s.visible ? '👁️' : '🕶️'}</span>
+            </div>
+        `).join('');
+    }
+
+    function selectShape(id) {
+        selectedId = id;
+        const s = shapes.find(x => x.id === id);
         
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(midX-15, midY-8, 30, 16); // Text Background
-        ctx.fillStyle = "#71717a";
-        ctx.font = "11px Inter";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(len, midX, midY);
+        // Update Properties Panel
+        const panel = document.getElementById('properties-panel');
+        if(s) {
+            panel.style.display = 'block';
+            document.getElementById('prop-name').value = s.name || "";
+            document.getElementById('prop-layer').value = s.layer;
+            tool = 'select'; // Auto switch tool
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tool-select').classList.add('active');
+        } else {
+            panel.style.display = 'none';
+        }
+
+        updateTree();
+        render();
     }
 
-    // --- LOGIC & CALCULATIONS ---
-    function updateBOM() {
-        // Only count 'Structural' lines for cost
-        let totalFt = shapes
-            .filter(s => s.layer === 'Structural')
-            .reduce((sum, s) => sum + Math.hypot(s.x2-s.x1, s.y2-s.y1)/24, 0);
-            
-        document.getElementById('bom-ft').innerText = totalFt.toFixed(1) + "'";
-        document.getElementById('bom-cost').innerText = "$" + (totalFt * LAYERS.Structural.cost).toLocaleString();
+    function updateProp(prop, val) {
+        const s = shapes.find(x => x.id === selectedId);
+        if(s) {
+            s[prop] = val;
+            updateTree(); // Name changed, update tree
+            render();
+        }
+    }
+
+    function toggleVis(e, id) {
+        e.stopPropagation();
+        const s = shapes.find(x => x.id === id);
+        if(s) { s.visible = !s.visible; updateTree(); render(); }
     }
 
     // --- INTERACTION ---
-    window.addEventListener('keydown', e => {
-        // Direct Distance Entry
-        if(drawing && /[0-9.]/.test(e.key)) {
-            inputBuffer += e.key;
-            showHUD(inputBuffer + "'");
-        }
-        // Commit Distance
-        if(drawing && e.key === 'Enter' && inputBuffer) {
-            const distPx = parseFloat(inputBuffer) * 24;
-            const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-            shapes.push({
-                x1: p1.x, y1: p1.y,
-                x2: p1.x + distPx * Math.cos(angle),
-                y2: p1.y + distPx * Math.sin(angle),
-                layer: tool === 'dim' ? 'Dimension' : activeLayer
-            });
-            drawing = false; inputBuffer = ""; hideHUD(); render();
-        }
-        // Undo
-        if((e.metaKey || e.ctrlKey) && e.key === 'z') undo();
-    });
-
     canvas.addEventListener('pointerdown', e => {
-        drawing = true;
-        p1 = { x: e.offsetX, y: e.offsetY };
-        p2 = p1;
+        const pt = {x: e.offsetX, y: e.offsetY};
+        
+        if(tool === 'select') {
+            // Hit Test
+            const hit = shapes.slice().reverse().find(s => {
+                const A=pt.x-s.x1, B=pt.y-s.y1, C=s.x2-s.x1, D=s.y2-s.y1;
+                const dot = A*C+B*D, lenSq = C*C+D*D;
+                let param = lenSq ? dot/lenSq : -1, xx, yy;
+                if(param<0) {xx=s.x1; yy=s.y1} else if(param>1) {xx=s.x2; yy=s.y2} else {xx=s.x1+param*C; yy=s.y1+param*D}
+                return Math.hypot(pt.x-xx, pt.y-yy) < 10;
+            });
+            
+            if(hit) selectShape(hit.id);
+            else selectShape(null);
+        } else {
+            drawing = true;
+            p1 = snap(pt); p2 = p1;
+        }
     });
 
     canvas.addEventListener('pointermove', e => {
-        if(!drawing) return;
-        p2 = { x: e.offsetX, y: e.offsetY };
-        
-        // Smart Snap (Orthogonal Shift)
-        if(e.shiftKey) {
-            const dx = Math.abs(p2.x - p1.x);
-            const dy = Math.abs(p2.y - p1.y);
-            if(dx > dy) p2.y = p1.y; else p2.x = p1.x;
+        if(drawing) {
+            p2 = snap({x: e.offsetX, y: e.offsetY});
+            if(e.shiftKey) { const dx=Math.abs(p2.x-p1.x), dy=Math.abs(p2.y-p1.y); if(dx>dy) p2.y=p1.y; else p2.x=p1.x; }
+            render();
+            showHUD((Math.hypot(p2.x-p1.x, p2.y-p1.y)/24).toFixed(1)+"'");
         }
-        
-        render();
-        const dist = (Math.hypot(p2.x-p1.x, p2.y-p1.y)/24).toFixed(1);
-        showHUD(dist + "'");
     });
 
     canvas.addEventListener('pointerup', () => {
-        if(drawing && !inputBuffer) {
-            shapes.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, layer: tool === 'dim' ? 'Dimension' : activeLayer });
-            drawing = false; hideHUD(); render();
+        if(drawing) {
+            if(Math.hypot(p2.x-p1.x, p2.y-p1.y) > 5) {
+                const newShape = {
+                    id: Date.now(),
+                    x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y,
+                    layer: tool === 'dim' ? 'Dimension' : 'Structural',
+                    visible: true, name: ""
+                };
+                shapes.push(newShape);
+                updateTree();
+                render();
+            }
+            drawing = false; hideHUD();
         }
     });
 
-    // --- EXPORT PDF WITH LEGEND ---
-    function exportPDF() {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('l', 'px', [canvas.width, canvas.height]);
-        
-        // 1. Draw Project
-        shapes.forEach(s => {
-            const style = LAYERS[s.layer];
-            doc.setDrawColor(style.color);
-            doc.setLineWidth(style.width * 0.5); // Thin lines for PDF
-            if(style.pattern.length) doc.setLineDash(style.pattern); else doc.setLineDash([]);
-            doc.line(s.x1, s.y1, s.x2, s.y2);
-        });
-
-        // 2. Draw Legend (Top Right)
-        const lx = canvas.width - 150, ly = 20;
-        doc.setFillColor(255, 255, 255);
-        doc.rect(lx, ly, 130, 100, 'F');
-        doc.setDrawColor(0); doc.setLineWidth(1); doc.rect(lx, ly, 130, 100);
-        
-        doc.setFontSize(12); doc.text("SYMBOL LEGEND", lx+10, ly+20);
-        
-        let yOff = 40;
-        Object.keys(LAYERS).forEach(key => {
-            if(key === 'Dimension') return;
-            const style = LAYERS[key];
-            doc.setDrawColor(style.color);
-            doc.setLineWidth(2);
-            doc.line(lx+10, ly+yOff, lx+40, ly+yOff);
-            
-            doc.setTextColor(0); doc.setFontSize(10);
-            doc.text(key, lx+50, ly+yOff+3);
-            yOff += 20;
-        });
-
-        doc.save("Project_Plan_Legend.pdf");
+    // --- UTILS ---
+    function snap(p) { return {x: Math.round(p.x/24)*24, y: Math.round(p.y/24)*24}; }
+    function deleteSelected() { 
+        if(selectedId) { shapes = shapes.filter(s => s.id !== selectedId); selectShape(null); } 
+    }
+    function setTool(t) { tool = t; document.querySelectorAll('.btn').forEach(b => b.classList.remove('active')); document.getElementById('tool-'+t).classList.add('active'); }
+    function showHUD(t) { const h=document.getElementById('hud'); h.style.display='block'; h.innerText=t; h.style.left=(event.clientX+15)+'px'; h.style.top=(event.clientY+15)+'px'; }
+    function hideHUD() { document.getElementById('hud').style.display='none'; }
+    function toggleTheme() { 
+        const root = document.documentElement;
+        root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+        render();
     }
 
-    // --- UTILS ---
-    function undo() { shapes.pop(); render(); }
-    function setTool(t) { tool = t; document.querySelectorAll('.btn').forEach(b => b.classList.remove('active')); document.getElementById('tool-'+t).classList.add('active'); }
-    function showHUD(t) { const h = document.getElementById('hud'); h.style.display = 'block'; h.innerText = t; h.style.left = (event.clientX+15)+'px'; h.style.top = (event.clientY+15)+'px'; }
-    function hideHUD() { document.getElementById('hud').style.display = 'none'; }
-    
-    // Init
     window.onresize = () => render();
     render();
+    updateTree();
 </script>
 </body>
 </html>

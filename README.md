@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>liteDRAFT | Enterprise Architect</title>
+    <title>liteDRAFT | Master Edition</title>
     <style>
         :root {
             --bg: #1e1e1e; --panel: #252526; --border: #333;
@@ -31,7 +31,7 @@
         
         /* CANVAS */
         #viewport { flex-grow: 1; overflow: hidden; position: relative; background: #121212; cursor: crosshair; }
-        canvas { display: block; }
+        canvas { display: block; width: 100%; height: 100%; }
         
         /* SIDEBAR */
         #sidebar {
@@ -43,8 +43,12 @@
         #props { padding: 10px; border-bottom: 1px solid var(--border); background: #1e1e1e; }
         .prop-row { display: flex; align-items: center; margin-bottom: 8px; font-size: 12px; }
         .prop-label { width: 70px; color: #888; }
+        
         input[type=text], input[type=number] { 
             background: #333; border: 1px solid #444; color: white; padding: 4px; border-radius: 2px; flex-grow: 1;
+        }
+        input[type=color] {
+            border: none; width: 30px; height: 20px; padding: 0; background: transparent; cursor: pointer;
         }
         
         /* TREE VIEW */
@@ -88,7 +92,11 @@
 
     <button class="btn active" id="t-draft" onclick="toggleDraft()" title="Draft Mode (Dims)">📐</button>
     
-    <button class="btn" onclick="clearAll()" title="Clear All Canvas" style="margin-left:auto; color:#ff4d4d;">🗑️ Clear All</button>
+    <div style="flex-grow:1;"></div>
+    
+    <button class="btn" onclick="toggleFullscreen()" title="Fullscreen Mode">⛶</button>
+    
+    <button class="btn" onclick="clearAll()" title="Clear All Canvas" style="color:#ff4d4d;">🗑️</button>
 </div>
 
 <div id="main">
@@ -104,11 +112,15 @@
         <div id="props">
             <div class="prop-row">
                 <span class="prop-label">Name</span>
-                <input type="text" id="p-name" placeholder="Object Name..." oninput="updateName(this.value)">
+                <input type="text" id="p-name" placeholder="Object Name..." oninput="updateProp('name', this.value)">
             </div>
             <div class="prop-row">
                 <span class="prop-label">Stroke</span>
-                <input type="number" id="p-stroke" value="2" min="1" max="50" onchange="updateStroke(this.value)">
+                <input type="number" id="p-stroke" value="2" min="1" max="50" onchange="updateProp('stroke', this.value)">
+            </div>
+            <div class="prop-row">
+                <span class="prop-label">Color</span>
+                <input type="color" id="p-color" value="#d4d4d4" onchange="updateProp('color', this.value)">
             </div>
         </div>
         
@@ -129,6 +141,7 @@
 <script>
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
+    const viewport = document.getElementById('viewport');
     
     // --- APP STATE ---
     let shapes = [];
@@ -143,6 +156,7 @@
     // Settings
     let draftMode = true;
     let nextId = 1;
+    let dpi = window.devicePixelRatio || 1;
 
     // --- INITIALIZATION ---
     function init() {
@@ -153,23 +167,37 @@
     }
 
     function resize() {
-        canvas.width = document.getElementById('viewport').clientWidth;
-        canvas.height = document.getElementById('viewport').clientHeight;
+        // High-DPI Support
+        dpi = window.devicePixelRatio || 1;
+        canvas.width = viewport.clientWidth * dpi;
+        canvas.height = viewport.clientHeight * dpi;
+        // Ensure CSS size matches viewport
+        canvas.style.width = viewport.clientWidth + 'px';
+        canvas.style.height = viewport.clientHeight + 'px';
+        
+        ctx.scale(dpi, dpi);
         render();
     }
 
     // --- RENDERING CORE ---
     function render() {
+        // Reset transform to clear
+        ctx.setTransform(1,0,0,1,0,0);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Apply DPI scaling
+        ctx.scale(dpi, dpi);
+
         // Background
         ctx.fillStyle = '#121212';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, viewport.clientWidth, viewport.clientHeight);
         
-        // Grid
-        drawGrid();
-
+        // Apply Pan/Zoom
         ctx.save();
         ctx.translate(offset.x, offset.y);
         ctx.scale(scale, scale);
+
+        drawGrid();
 
         // Render Hierarchy (Roots only)
         const roots = shapes.filter(s => !s.parentId);
@@ -188,14 +216,12 @@
         // If Group, draw children
         if(s.type === 'group') {
             const children = shapes.filter(c => c.parentId === s.id);
-            // Draw Group Bounding Box if selected
             if(selection.includes(s.id)) {
                 const b = getBounds(s);
                 ctx.strokeStyle = '#ffd700'; ctx.lineWidth = 1/scale; ctx.setLineDash([5/scale, 5/scale]);
                 ctx.strokeRect(b.x, b.y, b.w, b.h);
                 ctx.setLineDash([]);
             }
-            // Recurse
             children.forEach(c => drawNode(c));
             return;
         }
@@ -203,7 +229,8 @@
         const isSel = selection.includes(s.id) || (s.parentId && selection.includes(s.parentId));
         
         ctx.beginPath();
-        ctx.strokeStyle = isSel ? '#007acc' : '#d4d4d4';
+        // Use custom color or default
+        ctx.strokeStyle = isSel ? '#007acc' : (s.color || '#d4d4d4');
         ctx.lineWidth = (s.stroke || 2) / scale;
 
         if(s.type === 'line') { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x+s.w, s.y+s.h); }
@@ -241,13 +268,11 @@
         const dist = Math.hypot(x2-x1, y2-y1);
         ctx.save();
         ctx.translate(x1, y1); ctx.rotate(ang);
-        // Lines
         ctx.beginPath(); 
         ctx.moveTo(0,0); ctx.lineTo(0,o); 
         ctx.moveTo(dist,0); ctx.lineTo(dist,o);
         ctx.moveTo(0,o*0.8); ctx.lineTo(dist,o*0.8);
         ctx.stroke();
-        // Text
         if(Math.abs(ang) > Math.PI/2) { ctx.translate(dist/2, o); ctx.rotate(Math.PI); ctx.fillText(Math.round(dist), 0, 15/scale); }
         else ctx.fillText(Math.round(dist), dist/2, o*1.5);
         ctx.restore();
@@ -255,36 +280,42 @@
 
     function drawGrid() {
         ctx.beginPath();
-        const step = 50 * scale;
-        const ox = offset.x % step; const oy = offset.y % step;
-        ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
-        for(let x=ox; x<canvas.width; x+=step) { ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); }
-        for(let y=oy; y<canvas.height; y+=step) { ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); }
+        // Dynamic Grid lines
+        // Viewport bounds in world coords
+        const startX = -offset.x / scale;
+        const startY = -offset.y / scale;
+        const endX = startX + (viewport.clientWidth / scale);
+        const endY = startY + (viewport.clientHeight / scale);
+        
+        const step = 50; 
+        // Snap to grid lines
+        const firstX = Math.floor(startX / step) * step;
+        const firstY = Math.floor(startY / step) * step;
+
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 1/scale;
+        
+        for(let x=firstX; x<endX; x+=step) { ctx.moveTo(x, startY); ctx.lineTo(x, endY); }
+        for(let y=firstY; y<endY; y+=step) { ctx.moveTo(startX, y); ctx.lineTo(endX, y); }
         ctx.stroke();
     }
 
     // --- INTERACTION ---
     function getMouse(e) {
-        const r = canvas.getBoundingClientRect();
+        const r = viewport.getBoundingClientRect();
         return { x: (e.clientX - r.left - offset.x)/scale, y: (e.clientY - r.top - offset.y)/scale };
     }
 
-    canvas.addEventListener('pointerdown', e => {
+    viewport.addEventListener('pointerdown', e => {
         isDown = true;
         dragStart = getMouse(e);
         lastMouse = dragStart;
 
-        // Pan Mode (Middle Click or Space)
-        if(e.button === 1) { return; } 
+        if(e.button === 1) { return; } // Middle click pan
 
         if(tool === 'select') {
             const hit = hitTest(dragStart.x, dragStart.y);
-            
-            // Handle Group Selection Logic
             if(hit) {
-                // If hitting a child of a group, select the GROUP instead
                 const targetId = hit.parentId ? hit.parentId : hit.id;
-                
                 if(e.shiftKey) {
                     if(selection.includes(targetId)) selection = selection.filter(id => id !== targetId);
                     else selection.push(targetId);
@@ -298,7 +329,7 @@
         }
     });
 
-    canvas.addEventListener('pointermove', e => {
+    viewport.addEventListener('pointermove', e => {
         const curr = getMouse(e);
         document.getElementById('coords').innerText = `${Math.round(curr.x)}, ${Math.round(curr.y)}`;
 
@@ -316,10 +347,10 @@
             }
         }
         lastMouse = curr;
-        if(isDown && tool !== 'select') render(); // Re-render for preview
+        if(isDown && tool !== 'select') render();
     });
 
-    canvas.addEventListener('pointerup', e => {
+    viewport.addEventListener('pointerup', e => {
         if(isDown && tool !== 'select' && dragStart) {
             const w = lastMouse.x - dragStart.x;
             const h = lastMouse.y - dragStart.y;
@@ -328,7 +359,7 @@
                     id: nextId++, type: tool,
                     x: dragStart.x, y: dragStart.y, w: w, h: h,
                     name: `${tool} ${nextId}`,
-                    stroke: 2
+                    stroke: 2, color: '#d4d4d4'
                 });
                 saveToStorage();
                 updateUI(); render();
@@ -337,10 +368,22 @@
         isDown = false; dragStart = null;
     });
 
-    canvas.addEventListener('wheel', e => {
+    viewport.addEventListener('wheel', e => {
         e.preventDefault();
         const zoomSpeed = 0.001;
+        // Zoom towards mouse pointer logic
+        const r = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - r.left;
+        const mouseY = e.clientY - r.top;
+        
+        const worldBefore = { x: (mouseX - offset.x)/scale, y: (mouseY - offset.y)/scale };
+        
         scale = Math.max(0.1, scale - e.deltaY * zoomSpeed);
+        
+        // Adjust offset to keep mouse world position stable
+        offset.x = mouseX - worldBefore.x * scale;
+        offset.y = mouseY - worldBefore.y * scale;
+        
         render();
     });
 
@@ -348,23 +391,19 @@
     function moveRecursive(id, dx, dy) {
         const s = shapes.find(x => x.id === id);
         if(!s) return;
-        // If it's a shape, move it
         if(s.type !== 'group') { s.x += dx; s.y += dy; }
-        
-        // If it's a group, move children
         shapes.filter(c => c.parentId === id).forEach(c => moveRecursive(c.id, dx, dy));
     }
 
     function hitTest(mx, my) {
         return shapes.slice().reverse().find(s => {
-            if(s.type === 'group') return false; // Hit test children, not group container
+            if(s.type === 'group') return false;
             return mx >= s.x && mx <= s.x+s.w && my >= s.y && my <= s.y+s.h;
         });
     }
     
     function getBounds(s) {
         if(s.type !== 'group') return s;
-        // Calc group bounds
         let children = shapes.filter(c => c.parentId === s.id);
         if(children.length === 0) return {x:0,y:0,w:0,h:0};
         let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
@@ -375,30 +414,27 @@
         return {x:minX, y:minY, w:maxX-minX, h:maxY-minY};
     }
 
-    // --- CLEAR ALL FUNCTION ---
+    // --- ACTIONS ---
     function clearAll() {
-        if(confirm("Are you sure you want to clear the entire canvas? This cannot be undone.")) {
-            shapes = [];
-            selection = [];
-            nextId = 1;
-            saveToStorage();
-            updateUI();
-            render();
+        if(confirm("Are you sure you want to clear the entire canvas?")) {
+            shapes = []; selection = []; nextId = 1; saveToStorage(); updateUI(); render();
         }
     }
+    
+    function toggleFullscreen() {
+        if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); }
+        else { if (document.exitFullscreen) { document.exitFullscreen(); } }
+    }
 
-    // --- GROUPING ---
     function groupSelection() {
         if(selection.length < 1) return;
         const groupId = nextId++;
         const group = { id: groupId, type: 'group', name: 'New Group', parentId: null };
         shapes.push(group);
-        
         selection.forEach(id => {
             const s = shapes.find(x => x.id === id);
             if(s) s.parentId = groupId;
         });
-        
         selection = [groupId];
         saveToStorage(); updateUI(); render();
     }
@@ -407,25 +443,21 @@
         selection.forEach(id => {
             const s = shapes.find(x => x.id === id);
             if(s && s.type === 'group') {
-                shapes.filter(c => c.parentId === id).forEach(c => c.parentId = null); // Release children
-                shapes = shapes.filter(x => x.id !== id); // Delete group
+                shapes.filter(c => c.parentId === id).forEach(c => c.parentId = null);
+                shapes = shapes.filter(x => x.id !== id);
             }
         });
         selection = [];
         saveToStorage(); updateUI(); render();
     }
 
-    // --- STORAGE ENGINE ---
     function saveToStorage() {
         const data = JSON.stringify({ shapes, nextId });
-        // Simulating 500MB Limit Check
         const size = new Blob([data]).size;
-        const limit = 5 * 1024 * 1024; // 5MB safe limit for localStorage
+        const limit = 5 * 1024 * 1024;
         const pct = Math.min(100, (size / limit) * 100);
-        
         document.getElementById('disk-use').value = pct;
         document.getElementById('disk-text').innerText = (size/1024).toFixed(1) + ' KB';
-
         localStorage.setItem('liteDraft_Project', data);
     }
 
@@ -439,21 +471,18 @@
         }
     }
 
-    // --- UI UPDATES ---
     function updateUI() {
-        // Update Properties
         if(selection.length === 1) {
             const s = shapes.find(x => x.id === selection[0]);
             document.getElementById('p-name').value = s.name || '';
             document.getElementById('p-stroke').value = s.stroke || 2;
+            document.getElementById('p-color').value = s.color || '#d4d4d4';
         } else {
             document.getElementById('p-name').value = '';
         }
 
-        // Update Tree
         const tree = document.getElementById('tree-content');
         tree.innerHTML = '';
-        
         const buildTree = (parentId, depth) => {
             const nodes = shapes.filter(s => s.parentId === parentId);
             nodes.forEach(s => {
@@ -462,8 +491,7 @@
                 el.style.paddingLeft = (depth * 15 + 5) + 'px';
                 el.innerHTML = `<span class="t-icon">${s.type==='group'?'📁':(s.type==='line'?'📏':'⬜')}</span> <span class="t-name">${s.name}</span>`;
                 el.onclick = (e) => {
-                    if(e.shiftKey) { /* multi */ } 
-                    else selection = [s.id];
+                    if(e.shiftKey) { /* multi */ } else selection = [s.id];
                     updateUI(); render();
                 };
                 tree.appendChild(el);
@@ -473,20 +501,17 @@
         buildTree(null, 0);
     }
     
-    function updateName(val) {
-        if(selection.length === 1) {
-            const s = shapes.find(x => x.id === selection[0]);
-            s.name = val;
-            saveToStorage(); updateUI();
+    function updateProp(prop, val) {
+        if(selection.length > 0) {
+            selection.forEach(id => {
+                const s = shapes.find(x => x.id === id);
+                if(s) {
+                    if(prop === 'stroke') s.stroke = parseInt(val);
+                    else s[prop] = val;
+                }
+            });
+            saveToStorage(); updateUI(); render();
         }
-    }
-
-    function updateStroke(val) {
-        selection.forEach(id => {
-            const s = shapes.find(x => x.id === id);
-            if(s) s.stroke = parseInt(val);
-        });
-        saveToStorage(); render();
     }
 
     function drawPreview() {

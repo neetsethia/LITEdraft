@@ -1,311 +1,300 @@
-# LITEdraft
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <title>LiteDraft Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LiteDraft Studio | Enterprise</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
-            --bg: #000; --panel: rgba(28, 28, 30, 0.9); --accent: #0a84ff;
-            --text: #fff; --border: #38383a; --danger: #ff453a; --success: #32d74b;
+            --bg: #f4f4f5; --canvas-bg: #ffffff;
+            --ui-bg: rgba(255, 255, 255, 0.95);
+            --accent: #6366f1; --text: #18181b;
+            --border: #e4e4e7; --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
-        body { 
-            margin: 0; display: flex; height: 100vh; font-family: -apple-system, sans-serif; 
-            background: var(--bg); color: var(--text); overflow: hidden; touch-action: none;
+        body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+
+        /* --- UI COMPONENTS --- */
+        #toolbar {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: var(--ui-bg); border: 1px solid var(--border); border-radius: 12px;
+            display: flex; gap: 8px; padding: 8px; box-shadow: var(--shadow); z-index: 100;
+            backdrop-filter: blur(8px);
         }
         
-        /* Layout UI */
-        #sidebar { 
-            position: absolute; left: 15px; top: 15px; bottom: 15px; width: 65px; 
-            background: var(--panel); border: 1px solid var(--border); border-radius: 14px; 
-            display: flex; flex-direction: column; gap: 10px; padding: 15px 5px; 
-            align-items: center; box-shadow: 0 8px 32px rgba(0,0,0,0.5); backdrop-filter: blur(20px); z-index: 100; 
-        }
-        #topbar { 
-            position: absolute; top: 15px; left: 95px; right: 15px; height: 55px; 
-            background: var(--panel); border: 1px solid var(--border); border-radius: 14px; 
-            display: flex; align-items: center; padding: 0 15px; gap: 12px; backdrop-filter: blur(20px); z-index: 99; 
-        }
-        #settings-panel {
-            position: absolute; left: 95px; top: 80px; background: var(--panel);
-            border: 1px solid var(--border); border-radius: 10px; padding: 10px;
-            display: flex; gap: 15px; font-size: 11px; backdrop-filter: blur(10px); z-index: 98;
-        }
-        #legend-panel {
-            position: absolute; right: 15px; bottom: 85px; width: 220px;
-            background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-            padding: 15px; display: none; backdrop-filter: blur(20px); z-index: 97;
+        #inspector {
+            position: absolute; right: 20px; top: 20px; width: 260px;
+            background: var(--ui-bg); border: 1px solid var(--border); border-radius: 12px;
+            padding: 20px; box-shadow: var(--shadow); z-index: 90; backdrop-filter: blur(8px);
         }
 
-        canvas { background: var(--bg); cursor: crosshair; flex-grow: 1; display: block; }
+        .btn {
+            width: 40px; height: 40px; border: none; background: transparent; border-radius: 8px;
+            cursor: pointer; color: #52525b; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+        }
+        .btn:hover { background: #f4f4f5; color: var(--text); }
+        .btn.active { background: var(--accent); color: white; }
         
-        .tool-btn { 
-            width: 48px; height: 48px; border-radius: 10px; border: none; 
-            background: transparent; color: var(--text); font-size: 20px; 
-            display: flex; align-items: center; justify-content: center; cursor: pointer; 
+        .section-header { 
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; 
+            color: #71717a; margin: 16px 0 8px 0; 
         }
-        .tool-btn.active { background: var(--accent); }
-        .action-btn { 
-            background: #3a3a3c; color: white; border: none; padding: 8px 14px; 
-            border-radius: 8px; font-size: 11px; font-weight: 600; cursor: pointer; 
+        
+        #hud {
+            position: absolute; background: var(--text); color: white; padding: 6px 12px;
+            border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 12px;
+            pointer-events: none; display: none; z-index: 200; transform: translate(15px, 15px);
         }
-        select { background: #3a3a3c; color: white; border: none; padding: 6px; border-radius: 6px; font-size: 11px; }
-        .stats { margin-left: auto; font-family: monospace; color: var(--accent); font-weight: bold; }
-        .legend-item { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 12px; }
 
-        #exit-pres {
-            position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%);
-            padding: 12px 24px; border-radius: 30px; border: none; background: #000;
-            color: #fff; font-weight: bold; cursor: pointer; z-index: 1001; display: none;
-        }
+        canvas { display: block; background: var(--canvas-bg); cursor: crosshair; }
     </style>
 </head>
 <body>
 
-<div id="sidebar">
-    <button class="tool-btn active" onclick="setTool('line')" id="lineBtn">📏</button>
-    <button class="tool-btn" onclick="setTool('rect')" id="rectBtn">⬜</button>
-    <button class="tool-btn" onclick="setTool('symbol')" id="symbolBtn">🚪</button>
-    <button class="tool-btn" onclick="setTool('text')" id="textBtn">A</button>
-    <button class="tool-btn" onclick="setTool('tape')" id="tapeBtn">📍</button>
-    <hr style="width:50%; border:0.5px solid var(--border);">
-    <button class="tool-btn" onclick="setTool('eraser')" id="eraserBtn">🧹</button>
-    <button class="tool-btn" onclick="undo()">⟲</button>
-</div>
+<div id="hud"></div>
 
-<div id="topbar">
-    <button class="action-btn" id="unitBtn" onclick="toggleUnits()">IMPERIAL</button>
-    <select id="scaleSelect" onchange="changeScale(this.value)"></select>
-    <select id="tradeSelect" onchange="switchTrade(this.value)"></select>
-    <button class="action-btn" onclick="rotateTool()" id="rotateBtn">ROT: 0°</button>
-    <button class="action-btn" onclick="togglePresentation()" style="background:var(--success)">PRESENT</button>
-    <button class="action-btn" onclick="generateShareLink()" style="background:var(--accent)">SYNC</button>
-    <div class="stats" id="coords">0.0' , 0.0'</div>
-</div>
+<nav id="toolbar">
+    <button class="btn active" id="tool-line" onclick="setTool('line')" title="Draw Wall (L)">📏</button>
+    <button class="btn" id="tool-dim" onclick="setTool('dim')" title="Dimension (D)">📐</button>
+    <div style="width:1px; background:var(--border); margin:4px 0;"></div>
+    <button class="btn" id="tool-select" onclick="setTool('select')" title="Select & Edit (V)">🖐️</button>
+    <button class="btn" onclick="undo()" title="Undo (Cmd+Z)">⟲</button>
+    <div style="width:1px; background:var(--border); margin:4px 0;"></div>
+    <button class="btn" onclick="exportPDF()" title="Export with Legend">📄</button>
+</nav>
 
-<div id="settings-panel">
-    <span>Wall Thk: <select id="wallThk" onchange="wallThickness=parseFloat(this.value)"><option value="0.5">6"</option><option value="0.33">4"</option></select></span>
-    <span>Material: <select id="hatchType" onchange="activeHatch=this.value"><option value="solid">Solid</option><option value="brick">Brick</option></select></span>
-    <button class="action-btn" onclick="toggleLegend()">SCHEDULE</button>
-</div>
+<aside id="inspector">
+    <div style="font-weight:700; font-size:16px; margin-bottom:4px;">Project Specs</div>
+    <div style="font-size:12px; color:#71717a;">Enterprise Suite v2.0</div>
 
-<div id="legend-panel">
-    <h5 style="margin:0 0 10px 0; color:var(--accent)">COMPONENT SCHEDULE</h5>
-    <div id="legend-content"></div>
-</div>
+    <div class="section-header">Active Layer</div>
+    <select id="layerSelect" onchange="activeLayer=this.value; render();" style="width:100%; padding:8px; border-radius:6px; border:1px solid var(--border);">
+        <option value="Structural">Structural (Wall)</option>
+        <option value="Furniture">Furniture</option>
+        <option value="Utilities">Utilities (Gas/Elec)</option>
+    </select>
 
-<button id="exit-pres" onclick="togglePresentation()">EXIT PRESENTATION</button>
+    <div class="section-header">Visual Style</div>
+    <label style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:8px;">
+        <span>Rough Sketch</span>
+        <input type="checkbox" id="roughToggle" onchange="render()">
+    </label>
+    
+    <div class="section-header">Cost Estimate (BOM)</div>
+    <div style="background:#f4f4f5; padding:12px; border-radius:8px; font-size:12px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+            <span>Wall Length:</span> <strong id="bom-ft">0.0'</strong>
+        </div>
+        <div style="display:flex; justify-content:space-between; color:var(--accent);">
+            <span>Total Cost:</span> <strong id="bom-cost">$0.00</strong>
+        </div>
+    </div>
+</aside>
 
-<canvas id="draftCanvas"></canvas>
+<canvas id="mainCanvas"></canvas>
 
 <script>
-    const canvas = document.getElementById('draftCanvas'), ctx = canvas.getContext('2d');
-    let shapes = [], drawing = false, tool = 'line', tempTape = null, isPres = false;
-    let unitSystem = 'imperial', activeScale = '1/4"', currentScaleVal = 24;
-    let activeTrade = 'Architectural', wallThickness = 0.5, activeHatch = 'solid', currentRotation = 0;
-
-    const SCALES = {
-        imperial: { '1/8"': 12, '1/4"': 24, '1/2"': 48 },
-        metric: { '1:100': 20, '1:50': 40, '1:20': 100 }
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
+    
+    // --- STATE MANAGEMENT ---
+    let shapes = [];
+    let history = [];
+    let tool = 'line';
+    let drawing = false;
+    let p1 = {x:0, y:0}, p2 = {x:0, y:0};
+    let activeLayer = 'Structural';
+    let inputBuffer = "";
+    
+    // Layer Configuration (Color & Cost per Foot)
+    const LAYERS = {
+        'Structural': { color: '#18181b', width: 3, cost: 55, pattern: [] },
+        'Furniture':  { color: '#6366f1', width: 2, cost: 0,  pattern: [] },
+        'Utilities':  { color: '#ef4444', width: 2, cost: 25, pattern: [10, 5] },
+        'Dimension':  { color: '#a1a1aa', width: 1, cost: 0,  pattern: [] }
     };
 
-    const TRADES = {
-        'Architectural': { layer: 'Walls', color: '#FFFFFF', symbol: 'door' },
-        'Electrical': { layer: 'Electrical', color: '#FFD60A', symbol: 'outlet' },
-        'Plumbing': { layer: 'Plumbing', color: '#32ADE6', symbol: 'drain' }
-    };
-
-    const SYMBOLS = {
-        door: (ctx, x, y, rot) => {
-            const s = 3 * currentScaleVal;
-            ctx.save(); ctx.translate(x, y); ctx.rotate(rot * Math.PI/180);
-            ctx.beginPath(); ctx.arc(0, 0, s, 1.5 * Math.PI, 2 * Math.PI); ctx.lineTo(0,0); ctx.lineTo(0,-s); ctx.stroke(); ctx.restore();
-        },
-        outlet: (ctx, x, y, rot) => {
-            ctx.save(); ctx.translate(x, y); ctx.rotate(rot * Math.PI/180);
-            ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.moveTo(-8,0); ctx.lineTo(8,0); ctx.stroke(); ctx.restore();
-        },
-        drain: (ctx, x, y) => {
-            ctx.beginPath(); ctx.arc(x,y,6,0,Math.PI*2); ctx.moveTo(x-6,y-6); ctx.lineTo(x+6,y+6); ctx.moveTo(x+6,y-6); ctx.lineTo(x-6,y+6); ctx.stroke();
-        }
-    };
-
-    const dpr = window.devicePixelRatio || 1;
-    function resize() {
-        canvas.width = window.innerWidth * dpr; canvas.height = window.innerHeight * dpr;
-        ctx.scale(dpr, dpr); render();
-    }
-
-    function switchTrade(t) {
-        activeTrade = t; 
-        document.getElementById('symbolBtn').innerText = (t === 'Architectural' ? '🚪' : (t === 'Electrical' ? '🔌' : '💧'));
-        render();
-    }
-
-    function toggleUnits() {
-        unitSystem = unitSystem === 'imperial' ? 'metric' : 'imperial';
-        const sel = document.getElementById('scaleSelect'); sel.innerHTML = '';
-        Object.keys(SCALES[unitSystem]).forEach(k => sel.add(new Option(k, k)));
-        activeScale = Object.keys(SCALES[unitSystem])[0];
-        currentScaleVal = SCALES[unitSystem][activeScale];
-        document.getElementById('unitBtn').innerText = unitSystem.toUpperCase();
-        render();
-    }
-
-    function changeScale(v) { activeScale = v; currentScaleVal = SCALES[unitSystem][v]; render(); }
-    function rotateTool() { currentRotation = (currentRotation + 90) % 360; document.getElementById('rotateBtn').innerText = `ROT: ${currentRotation}°`; }
-
-    function togglePresentation() {
-        isPres = !isPres;
-        const ui = ['sidebar', 'topbar', 'settings-panel', 'legend-panel'];
-        ui.forEach(id => document.getElementById(id).style.display = isPres ? 'none' : (id === 'legend-panel' ? 'none' : ''));
-        document.getElementById('exit-pres').style.display = isPres ? 'block' : 'none';
-        render();
-    }
-
-    function getSnap(mx, my) {
-        let best = { x: Math.round(mx/currentScaleVal)*currentScaleVal, y: Math.round(my/currentScaleVal)*currentScaleVal };
-        shapes.forEach(s => {
-            const pts = s.type === 'line' ? [{x:s.x1, y:s.y1}, {x:s.x2, y:s.y2}] : [];
-            pts.forEach(p => { if(Math.hypot(mx-p.x, my-p.y) < 15) best = {x:p.x, y:p.y}; });
-        });
-        return best;
-    }
-
-    canvas.addEventListener('pointerdown', e => {
-        const snap = getSnap(e.offsetX, e.offsetY);
-        if (tool === 'eraser') { eraseAt(e.offsetX, e.offsetY); return; }
-        if (tool === 'tape') { tempTape = {x1:e.offsetX, y1:e.offsetY, x2:e.offsetX, y2:e.offsetY}; return; }
-        if (tool === 'text') {
-            const txt = prompt("Room Label:");
-            if(txt) { shapes.push({type:'text', label:txt, x:e.offsetX, y:e.offsetY, layer:TRADES[activeTrade].layer}); save(); render(); }
-            return;
-        }
-        if (tool === 'symbol') {
-            shapes.push({type:'symbol', symbolType:TRADES[activeTrade].symbol, x:snap.x, y:snap.y, rotation:currentRotation, layer:TRADES[activeTrade].layer});
-            save(); render(); return;
-        }
-        drawing = true; startX = snap.x; startY = snap.y;
-    });
-
-    canvas.addEventListener('pointermove', e => {
-        const snap = getSnap(e.offsetX, e.offsetY);
-        const unitLabel = unitSystem === 'imperial' ? "'" : "m";
-        document.getElementById('coords').innerText = `${(snap.x/currentScaleVal).toFixed(1)}${unitLabel} , ${(snap.y/currentScaleVal).toFixed(1)}${unitLabel}`;
-        
-        if (tempTape) { tempTape.x2 = e.offsetX; tempTape.y2 = e.offsetY; render(); return; }
-        if (!drawing) return;
-        render();
-        ctx.setLineDash([5,5]); ctx.strokeStyle = "#888";
-        if(tool==='line') { ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(snap.x, snap.y); ctx.stroke(); }
-        else if(tool==='rect') ctx.strokeRect(startX, startY, snap.x-startX, snap.y-startY);
-    });
-
-    canvas.addEventListener('pointerup', e => {
-        if (tempTape) { tempTape = null; render(); return; }
-        if (!drawing) return;
-        const snap = getSnap(e.offsetX, e.offsetY);
-        const weight = (e.pressure || 0.5) * 4 + 1;
-        if(tool==='line') shapes.push({type:'line', x1:startX, y1:startY, x2:snap.x, y2:snap.y, weight, layer:TRADES[activeTrade].layer});
-        else if(tool==='rect') shapes.push({type:'rect', x:startX, y:startY, w:snap.x-startX, h:snap.y-startY, weight, layer:TRADES[activeTrade].layer});
-        drawing = false; save(); render();
-    });
-
+    // --- CORE RENDER LOOP ---
     function render() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        canvas.style.background = isPres ? "#fdfdfd" : "#000";
-        if (!isPres) drawGrid();
+        // Resize Canvas to Window
+        if(canvas.width !== window.innerWidth) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
 
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw Grid
+        drawGrid();
+
+        // Draw Shapes
         shapes.forEach(s => {
-            const isFocus = s.layer === TRADES[activeTrade].layer;
-            ctx.strokeStyle = isPres ? "#000" : (isFocus ? TRADES[activeTrade].color : "#444");
-            ctx.lineWidth = s.weight || 2; ctx.setLineDash([]);
-            ctx.shadowBlur = (!isPres && isFocus && s.layer !== 'Walls') ? 8 : 0;
-            ctx.shadowColor = ctx.strokeStyle;
-            
-            if (s.type === 'line') {
-                ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
-                if(!isPres) drawDim(s.x1, s.y1, s.x2, s.y2);
-            } else if (s.type === 'rect') {
-                if(isPres && s.layer === 'Walls') { ctx.fillStyle="#000"; ctx.fillRect(s.x, s.y, s.w, s.h); }
-                ctx.strokeRect(s.x, s.y, s.w, s.h);
-                if(!isPres) {
-                    const area = (Math.abs(s.w*s.h) / (currentScaleVal**2)).toFixed(1);
-                    ctx.fillStyle = "#888"; ctx.font = "10px sans-serif";
-                    ctx.fillText(area + (unitSystem==='imperial'?" sq ft":" m²"), s.x + s.w/2 - 15, s.y + s.h/2);
-                }
-            } else if (s.type === 'symbol') SYMBOLS[s.symbolType](ctx, s.x, s.y, s.rotation);
-            else if (s.type === 'text') {
-                ctx.fillStyle = isPres ? "#000" : "#fff"; ctx.font = "bold 13px sans-serif";
-                ctx.fillText(s.label.toUpperCase(), s.x, s.y);
+            const style = LAYERS[s.layer] || LAYERS['Structural'];
+            ctx.beginPath();
+            ctx.strokeStyle = style.color;
+            ctx.lineWidth = style.width;
+            ctx.setLineDash(style.pattern);
+
+            // Rough Mode Logic (Jitter)
+            if(document.getElementById('roughToggle').checked && s.layer !== 'Dimension') {
+                const jit = () => (Math.random()-0.5)*2;
+                ctx.moveTo(s.x1+jit(), s.y1+jit());
+                ctx.lineTo(s.x2+jit(), s.y2+jit());
+            } else {
+                ctx.moveTo(s.x1, s.y1);
+                ctx.lineTo(s.x2, s.y2);
             }
+            ctx.stroke();
+
+            // Dimension Rendering
+            if (s.layer === 'Dimension') drawDimensionText(s);
         });
-        if(tempTape) drawTape();
+
+        // Draw Preview Line
+        if(drawing) {
+            ctx.beginPath();
+            ctx.strokeStyle = '#6366f1';
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        updateBOM();
     }
 
     function drawGrid() {
-        ctx.strokeStyle = "#111"; ctx.lineWidth = 1;
-        for (let i = 0; i < canvas.width; i += currentScaleVal) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke(); }
-        for (let i = 0; i < canvas.height; i += currentScaleVal) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke(); }
+        ctx.strokeStyle = '#e4e4e7';
+        ctx.lineWidth = 1;
+        const step = 24; // 1ft
+        for(let x=0; x<canvas.width; x+=step*2) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke(); }
+        for(let y=0; y<canvas.height; y+=step*2) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke(); }
     }
 
-    function drawDim(x1, y1, x2, y2) {
-        const d = (Math.hypot(x2-x1, y2-y1) / currentScaleVal).toFixed(1);
-        ctx.fillStyle = "#0a84ff"; ctx.font = "10px monospace";
-        ctx.fillText(d + (unitSystem==='imperial'?"'":"m"), (x1+x2)/2, (y1+y2)/2 - 5);
+    function drawDimensionText(s) {
+        const midX = (s.x1 + s.x2) / 2;
+        const midY = (s.y1 + s.y2) / 2;
+        const len = (Math.hypot(s.x2-s.x1, s.y2-s.y1) / 24).toFixed(1) + "'";
+        
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(midX-15, midY-8, 30, 16); // Text Background
+        ctx.fillStyle = "#71717a";
+        ctx.font = "11px Inter";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(len, midX, midY);
     }
 
-    function drawTape() {
-        ctx.setLineDash([2,2]); ctx.strokeStyle = "#ff9800"; ctx.beginPath();
-        ctx.moveTo(tempTape.x1, tempTape.y1); ctx.lineTo(tempTape.x2, tempTape.y2); ctx.stroke();
-        const d = (Math.hypot(tempTape.x2-tempTape.x1, tempTape.y2-tempTape.y1) / currentScaleVal).toFixed(2);
-        ctx.fillStyle = "#ff9800"; ctx.fillRect(tempTape.x2+5, tempTape.y2-20, 50, 18);
-        ctx.fillStyle = "#000"; ctx.fillText(d + (unitSystem==='imperial'?"'":"m"), tempTape.x2+8, tempTape.y2-7);
+    // --- LOGIC & CALCULATIONS ---
+    function updateBOM() {
+        // Only count 'Structural' lines for cost
+        let totalFt = shapes
+            .filter(s => s.layer === 'Structural')
+            .reduce((sum, s) => sum + Math.hypot(s.x2-s.x1, s.y2-s.y1)/24, 0);
+            
+        document.getElementById('bom-ft').innerText = totalFt.toFixed(1) + "'";
+        document.getElementById('bom-cost').innerText = "$" + (totalFt * LAYERS.Structural.cost).toLocaleString();
     }
 
-    function setTool(t) { tool = t; document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active')); document.getElementById(t+'Btn').classList.add('active'); }
-    function save() { localStorage.setItem('ld_final_pro', JSON.stringify(shapes)); }
-    function undo() { shapes.pop(); save(); render(); }
-    function eraseAt(x, y) { shapes = shapes.filter(s => Math.hypot((s.x || s.x1) - x, (s.y || s.y1) - y) > 25); save(); render(); }
-    
-    function toggleLegend() { 
-        const p = document.getElementById('legend-panel'); 
-        p.style.display = p.style.display === 'block' ? 'none' : 'block'; 
-        if(p.style.display === 'block') updateLegend(); 
-    }
-
-    function updateLegend() {
-        const cont = document.getElementById('legend-content'); cont.innerHTML = '';
-        const counts = {};
-        shapes.forEach(s => { const k = s.symbolType || s.type; counts[k] = (counts[k] || 0) + 1; });
-        for(let k in counts) cont.innerHTML += `<div class="legend-item"><span>${k.toUpperCase()}</span><span>x${counts[k]}</span></div>`;
-    }
-
-    function generateShareLink() {
-        const data = btoa(encodeURIComponent(JSON.stringify(shapes)));
-        const url = window.location.origin + window.location.pathname + '?data=' + data;
-        navigator.clipboard.writeText(url).then(() => alert("Cloud Sync Link Copied to Clipboard!"));
-    }
-
-    window.onload = () => {
-        const tSel = document.getElementById('tradeSelect'); Object.keys(TRADES).forEach(t => tSel.add(new Option(t, t)));
-        toggleUnits(); resize();
-        const params = new URLSearchParams(window.location.search);
-        if(params.get('data')) shapes = JSON.parse(decodeURIComponent(atob(params.get('data'))));
-        else shapes = JSON.parse(localStorage.getItem('ld_final_pro') || '[]');
-        render();
-    };
-    window.addEventListener('resize', resize);
-    window.addEventListener('keydown', e => { 
-        if(e.code==='Space') { e.preventDefault(); rotateTool(); } 
-        if(e.ctrlKey && e.key==='z') undo();
-        if(e.key==='Escape' && isPres) togglePresentation();
+    // --- INTERACTION ---
+    window.addEventListener('keydown', e => {
+        // Direct Distance Entry
+        if(drawing && /[0-9.]/.test(e.key)) {
+            inputBuffer += e.key;
+            showHUD(inputBuffer + "'");
+        }
+        // Commit Distance
+        if(drawing && e.key === 'Enter' && inputBuffer) {
+            const distPx = parseFloat(inputBuffer) * 24;
+            const angle = Math.atan2(p2.y-p1.y, p2.x-p1.x);
+            shapes.push({
+                x1: p1.x, y1: p1.y,
+                x2: p1.x + distPx * Math.cos(angle),
+                y2: p1.y + distPx * Math.sin(angle),
+                layer: tool === 'dim' ? 'Dimension' : activeLayer
+            });
+            drawing = false; inputBuffer = ""; hideHUD(); render();
+        }
+        // Undo
+        if((e.metaKey || e.ctrlKey) && e.key === 'z') undo();
     });
+
+    canvas.addEventListener('pointerdown', e => {
+        drawing = true;
+        p1 = { x: e.offsetX, y: e.offsetY };
+        p2 = p1;
+    });
+
+    canvas.addEventListener('pointermove', e => {
+        if(!drawing) return;
+        p2 = { x: e.offsetX, y: e.offsetY };
+        
+        // Smart Snap (Orthogonal Shift)
+        if(e.shiftKey) {
+            const dx = Math.abs(p2.x - p1.x);
+            const dy = Math.abs(p2.y - p1.y);
+            if(dx > dy) p2.y = p1.y; else p2.x = p1.x;
+        }
+        
+        render();
+        const dist = (Math.hypot(p2.x-p1.x, p2.y-p1.y)/24).toFixed(1);
+        showHUD(dist + "'");
+    });
+
+    canvas.addEventListener('pointerup', () => {
+        if(drawing && !inputBuffer) {
+            shapes.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y, layer: tool === 'dim' ? 'Dimension' : activeLayer });
+            drawing = false; hideHUD(); render();
+        }
+    });
+
+    // --- EXPORT PDF WITH LEGEND ---
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('l', 'px', [canvas.width, canvas.height]);
+        
+        // 1. Draw Project
+        shapes.forEach(s => {
+            const style = LAYERS[s.layer];
+            doc.setDrawColor(style.color);
+            doc.setLineWidth(style.width * 0.5); // Thin lines for PDF
+            if(style.pattern.length) doc.setLineDash(style.pattern); else doc.setLineDash([]);
+            doc.line(s.x1, s.y1, s.x2, s.y2);
+        });
+
+        // 2. Draw Legend (Top Right)
+        const lx = canvas.width - 150, ly = 20;
+        doc.setFillColor(255, 255, 255);
+        doc.rect(lx, ly, 130, 100, 'F');
+        doc.setDrawColor(0); doc.setLineWidth(1); doc.rect(lx, ly, 130, 100);
+        
+        doc.setFontSize(12); doc.text("SYMBOL LEGEND", lx+10, ly+20);
+        
+        let yOff = 40;
+        Object.keys(LAYERS).forEach(key => {
+            if(key === 'Dimension') return;
+            const style = LAYERS[key];
+            doc.setDrawColor(style.color);
+            doc.setLineWidth(2);
+            doc.line(lx+10, ly+yOff, lx+40, ly+yOff);
+            
+            doc.setTextColor(0); doc.setFontSize(10);
+            doc.text(key, lx+50, ly+yOff+3);
+            yOff += 20;
+        });
+
+        doc.save("Project_Plan_Legend.pdf");
+    }
+
+    // --- UTILS ---
+    function undo() { shapes.pop(); render(); }
+    function setTool(t) { tool = t; document.querySelectorAll('.btn').forEach(b => b.classList.remove('active')); document.getElementById('tool-'+t).classList.add('active'); }
+    function showHUD(t) { const h = document.getElementById('hud'); h.style.display = 'block'; h.innerText = t; h.style.left = (event.clientX+15)+'px'; h.style.top = (event.clientY+15)+'px'; }
+    function hideHUD() { document.getElementById('hud').style.display = 'none'; }
+    
+    // Init
+    window.onresize = () => render();
+    render();
 </script>
 </body>
 </html>
-
